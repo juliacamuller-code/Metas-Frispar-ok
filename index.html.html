@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>META+FRISPAR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#080808;--bg2:#111;--bg3:#1a1a1a;--bg4:#222;
+  --border:#282828;--border2:#333;
+  --gold:#C8902A;--gold2:#E8B540;--gold3:#8A6218;--goldfaint:rgba(200,144,42,0.08);
+  --text:#F0EDE8;--text2:#9A9590;--text3:#555;
+  --green:#22C55E;--red:#EF4444;--yellow:#F59E0B;
+  --r:8px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.5}
+#root{display:flex;height:100vh;overflow:hidden}
+/* SIDEBAR */
+.sidebar{width:220px;min-width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:0 0 16px}
+.sb-logo{padding:20px 18px 16px;border-bottom:1px solid var(--border)}
+.sb-logo h1{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1px;color:var(--gold2);line-height:1}
+.sb-logo span{font-size:10px;color:var(--text3);letter-spacing:2px;text-transform:uppercase}
+.sb-nav{flex:1;padding:12px 8px;display:flex;flex-direction:column;gap:2px}
+.sb-item{padding:9px 12px;border-radius:var(--r);cursor:pointer;display:flex;align-items:center;gap:10px;color:var(--text2);font-size:13px;font-weight:500;transition:all .15s;border:1px solid transparent}
+.sb-item:hover{background:var(--bg3);color:var(--text)}
+.sb-item.active{background:var(--goldfaint);color:var(--gold2);border-color:var(--gold3)}
+.sb-item svg{opacity:.7;width:16px;height:16px;flex-shrink:0}
+.sb-item.active svg{opacity:1}
+.sb-foot{padding:12px 12px 0;border-top:1px solid var(--border);font-size:11px;color:var(--text3)}
+/* MAIN */
+.main{flex:1;overflow:auto;display:flex;flex-direction:column;min-width:0}
+.topbar{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg2);position:sticky;top:0;z-index:10}
+.topbar-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.5px;color:var(--text)}
+.month-sel{display:flex;align-items:center;gap:8px}
+.month-btn{background:var(--bg3);border:1px solid var(--border);color:var(--text2);width:28px;height:28px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .15s}
+.month-btn:hover{background:var(--bg4);color:var(--text)}
+.month-label{font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:var(--gold2);min-width:130px;text-align:center}
+.content{padding:24px;flex:1}
+/* CARDS */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px}
+.card-sm{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.grid-teams{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.label{font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:6px}
+.big-num{font-family:'Bebas Neue',sans-serif;font-size:48px;line-height:1;letter-spacing:1px}
+.med-num{font-family:'DM Mono',monospace;font-size:20px;font-weight:500}
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.5px}
+.badge-green{background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.badge-red{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+.badge-yellow{background:rgba(245,158,11,.12);color:var(--yellow);border:1px solid rgba(245,158,11,.2)}
+.badge-gold{background:var(--goldfaint);color:var(--gold2);border:1px solid var(--gold3)}
+.badge-gray{background:var(--bg3);color:var(--text3);border:1px solid var(--border)}
+/* PROGRESS */
+.progress{height:6px;background:var(--bg4);border-radius:3px;overflow:hidden;margin-top:8px}
+.progress-fill{height:100%;border-radius:3px;transition:width .5s ease;background:var(--gold)}
+.progress-fill.green{background:var(--green)}
+.progress-fill.red{background:var(--red)}
+/* TABLE */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead th{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border)}
+tbody td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text2)}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:var(--bg3);color:var(--text)}
+/* FORMS */
+.form-group{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.form-label{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3)}
+input[type=date]{color-scheme:dark}
+input[type=number],input[type=text],input[type=date],select{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:9px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%;outline:none;transition:border-color .15s}
+input[type=number]:focus,input[type=text]:focus,select:focus{border-color:var(--gold3)}
+select option{background:var(--bg3)}
+/* BUTTONS */
+.btn{padding:9px 18px;border-radius:7px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-gold{background:var(--gold);color:#000}
+.btn-gold:hover{background:var(--gold2)}
+.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--text2)}
+.btn-ghost:hover{background:var(--bg3);color:var(--text)}
+.btn-red{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+.btn-sm{padding:5px 12px;font-size:12px}
+/* TABS */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:20px}
+.tab{padding:8px 14px;cursor:pointer;font-size:13px;font-weight:500;color:var(--text3);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;white-space:nowrap}
+.tab:hover{color:var(--text2)}
+.tab.active{color:var(--gold2);border-bottom-color:var(--gold)}
+/* SECTION HEADER */
+.sec-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.sec-title{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.5px;color:var(--text)}
+/* META ITEM */
+.meta-item{display:flex;align-items:flex-start;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
+.meta-item:last-child{border-bottom:none;padding-bottom:0}
+.meta-item-label{font-size:13px;font-weight:500;color:var(--text2)}
+.meta-item-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.meta-item-value{text-align:right}
+.meta-val{font-family:'DM Mono',monospace;font-size:14px;font-weight:500;color:var(--text)}
+/* EMPRESA CARD */
+.empresa-card{position:relative;overflow:hidden}
+.empresa-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,var(--goldfaint) 0%,transparent 60%);pointer-events:none}
+/* SORTEIO */
+.sorteio-star{display:inline-block;color:var(--gold2);margin-right:4px}
+/* WEEK CARDS */
+.week-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px}
+.week-card{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px}
+.week-title{font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:.5px;color:var(--text2);margin-bottom:10px}
+.week-inputs{display:flex;flex-direction:column;gap:8px}
+.week-row{display:flex;align-items:center;gap:8px}
+.week-row-label{font-size:11px;color:var(--text3);width:90px;flex-shrink:0}
+.week-row input{flex:1}
+/* COLLAB ROW */
+.collab-row{display:flex;align-items:center;gap:12px;padding:8px 12px;background:var(--bg3);border-radius:8px;margin-bottom:6px}
+.collab-name{flex:1;font-size:13px;font-weight:500}
+.collab-team{font-size:11px;color:var(--gold3)}
+.collab-inputs{display:flex;gap:8px}
+.collab-input-wrap{display:flex;flex-direction:column;align-items:center;gap:3px}
+.collab-input-wrap span{font-size:10px;color:var(--text3);letter-spacing:.5px}
+.collab-input-wrap input{width:56px;text-align:center}
+/* LOADING */
+.loading{display:flex;align-items:center;justify-content:center;height:200px;color:var(--text3);font-size:13px}
+/* HISTORICO */
+.hist-table th:first-child,.hist-table td:first-child{position:sticky;left:0;background:var(--bg2);z-index:1}
+/* SCROLL */
+.overflow-tabs{overflow-x:auto;-webkit-overflow-scrolling:touch}
+/* STATUS INDICATOR */
+.status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.status-dot.green{background:var(--green)}
+.status-dot.red{background:var(--red)}
+.status-dot.gray{background:var(--text3)}
+/* SUBITEM */
+.subitem{display:flex;align-items:center;justify-content:space-between;padding:4px 0 4px 12px;border-left:2px solid var(--border)}
+.subitem .ok{color:var(--green);font-size:11px}
+.subitem .fail{color:var(--red);font-size:11px}
+/* EMPTY */
+.empty{text-align:center;padding:40px 20px;color:var(--text3);font-size:13px}
+.empty-icon{font-size:32px;margin-bottom:8px}
+/* NOTIFY */
+.notify{position:fixed;bottom:24px;right:24px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--text);box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:100;display:flex;align-items:center;gap:8px;animation:slideup .2s ease}
+@keyframes slideup{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
+/* RESPONSIVE */
+@media(max-width:768px){
+  .sidebar{display:none}
+  .grid3,.grid2{grid-template-columns:1fr}
+  .week-grid{grid-template-columns:1fr}
+}
+/* DIVIDER */
+.divider{height:1px;background:var(--border);margin:16px 0}
+/* CHIP */
+.chip{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;background:var(--bg4);color:var(--text3);border:1px solid var(--border)}
+.chip-gold{background:var(--goldfaint);color:var(--gold2);border-color:var(--gold3)}
+/* HIGHLIGHT ROW */
+.highlight-row td{background:rgba(200,144,42,0.04)!important}
+/* FLEX UTILS */
+.flex{display:flex}.flex-col{flex-direction:column}.items-center{align-items:center}.justify-between{justify-content:space-between}.gap4{gap:4px}.gap8{gap:8px}.gap12{gap:12px}.gap16{gap:16px}.gap20{gap:20px}.mt4{margin-top:4px}.mt8{margin-top:8px}.mt12{margin-top:12px}.mt16{margin-top:16px}.mt20{margin-top:20px}.mb4{margin-bottom:4px}.mb8{margin-bottom:8px}.mb12{margin-bottom:12px}.mb16{margin-bottom:16px}.w100{width:100%}.text-right{text-align:right}.text-center{text-align:center}.fw5{font-weight:500}.fw6{font-weight:600}.mono{font-family:'DM Mono',monospace}.fs12{font-size:12px}.fs11{font-size:11px}.c-gold{color:var(--gold2)}.c-text2{color:var(--text2)}.c-text3{color:var(--text3)}.c-green{color:var(--green)}.c-red{color:var(--red)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ─── FIREBASE CONFIG ────────────────────────────────────────────────────────
+// SUBSTITUA pelos seus dados do Firebase Console
+const firebaseConfig = {
+  apiKey: "AIzaSyAwUDDq2_zUU_az7syIweWMN_vjUL8WnmU",
+  authDomain: "programa-de-metas-d9c96.firebaseapp.com",
+  databaseURL: "https://programa-de-metas-d9c96-default-rtdb.firebaseio.com",
+  projectId: "programa-de-metas-d9c96",
+  storageBucket: "programa-de-metas-d9c96.firebasestorage.app",
+  messagingSenderId: "722066281052",
+  appId: "1:722066281052:web:1be838e50518e9e7ca4c99"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ─── CONSTANTES ──────────────────────────────────────────────────────────────
+const EQUIPES = { abate:'Linha de Abate', miudos:'Miúdos', areaExterna:'Área Externa', desossa:'Desossa', expedicao:'Expedição' };
+const EQUIPES_IDS = Object.keys(EQUIPES);
+const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const ANIMAIS_DIA = 140;
+const COR_EQUIPE = { abate:'#C8902A', miudos:'#6366F1', areaExterna:'#22C55E', desossa:'#F59E0B', expedicao:'#EF4444' };
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const getMesKey = (a,m) => `${a}-${String(m+1).padStart(2,'0')}`;
+const fmt = n => n !== null && n !== undefined ? new Intl.NumberFormat('pt-BR').format(Math.round(n)) : '—';
+const fmtPct = n => n !== null && n !== undefined ? n.toFixed(1).replace('.',',')+'%' : '—';
+const fmtDec = n => n !== null && n !== undefined ? n.toFixed(2).replace('.',',') : '—';
+const now = new Date();
+
+// Retorna true se o colaborador já era elegível no mês informado (entrou ANTES desse mês)
+const colabElegivelNoMes = (c, mesKey) => {
+  if(!c.dataEntrada) return true; // sem data cadastrada: considera elegível
+  return c.dataEntrada.slice(0,7) < mesKey; // entrou antes do mês → elegível
+};
+
+// ─── CÁLCULOS ────────────────────────────────────────────────────────────────
+function calcEmpresa(d = {}) {
+  const meta = (d.diasUteis||0) * ANIMAIS_DIA;
+  const real = d.animaisAbatidos||0;
+  const atingida = meta > 0 && real >= meta;
+  return { meta, real, diasUteis: d.diasUteis||0, atingida, pct: meta > 0 ? Math.min(100, real/meta*100) : 0 };
+}
+
+function calcIndividual(d = {}) {
+  const { faltas=0, atestados=0, advertencias=0 } = d;
+  const ok = faltas===0 && atestados===0 && advertencias===0;
+  return { faltas, atestados, advertencias, atingida: ok, bonus: ok?120:0 };
+}
+
+function calcEquipes(eq = {}) {
+  const r = {};
+
+  // ABATE
+  const ab = eq.abate||{};
+  const pc = ab.carcacasTotal>0 ? ab.carcacasContaminadas/ab.carcacasTotal*100 : null;
+  const pco = ab.courosTotal>0 ? ab.courosFurados/ab.courosTotal*100 : null;
+  r.abate = {
+    metas: [
+      { nome:'Contaminação Carcaça', val: fmtPct(pc), threshold:'≤ 35%', ok: pc!==null&&pc<=35, bonus:60 },
+      { nome:'Couro Furado', val: fmtPct(pco), threshold:'≤ 10%', ok: pco!==null&&pco<=10, bonus:60 },
+    ], semDados: pc===null,
+  };
+  r.abate.bonus = r.abate.metas.reduce((a,m)=>a+(m.ok?m.bonus:0),0);
+  r.abate.allOk = r.abate.metas.every(m=>m.ok);
+
+  // MIÚDOS
+  const mi = eq.miudos||{};
+  const pl = mi.linguasTotal>0 ? mi.linguasContaminadas/mi.linguasTotal*100 : null;
+  const pc2 = mi.coracoesTotal>0 ? mi.coracoesContaminados/mi.coracoesTotal*100 : null;
+  const pr = mi.rumensTotal>0 ? mi.rumensContaminados/mi.rumensTotal*100 : null;
+  const mc = mi.animaisTotal>0 ? mi.kgCarne/mi.animaisTotal : null;
+  const contamOk = pl!==null&&pc2!==null&&pr!==null&&pl===0&&pc2===0&&pr<=8;
+  r.miudos = {
+    metas: [
+      { nome:'Contaminação Miúdos', val: pl!==null?`L:${fmtPct(pl)} C:${fmtPct(pc2)} R:${fmtPct(pr)}`:'—',
+        threshold:'Língua+Cor.=0%, Rúmens≤8%', ok:contamOk, bonus:60,
+        sub: pl!==null?[
+          {nome:'Línguas',val:fmtPct(pl),meta:'0%',ok:pl===0},
+          {nome:'Corações',val:fmtPct(pc2),meta:'0%',ok:pc2===0},
+          {nome:'Rúmens',val:fmtPct(pr),meta:'≤ 8%',ok:pr!==null&&pr<=8},
+        ]:null },
+      { nome:'Carne de Cabeça', val: mc!==null?fmtDec(mc)+' kg/animal':'—', threshold:'≥ 2,6 kg/animal', ok:mc!==null&&mc>=2.6, bonus:60 },
+    ], semDados: pl===null,
+  };
+  r.miudos.bonus = r.miudos.metas.reduce((a,m)=>a+(m.ok?m.bonus:0),0);
+  r.miudos.allOk = r.miudos.metas.every(m=>m.ok);
+
+  // ÁREA EXTERNA
+  const ae = (eq.areaExterna||{}).semanas||{};
+  let totalNota=0, totalSemanas=0, semDados=true;
+  [1,2,3,4].forEach(i=>{
+    const s=ae[i];
+    if(!s) return;
+    semDados=false; totalSemanas++;
+    const itens=[s.limpeza||0,s.organizacao||0,s.seguranca||0];
+    const passou=itens.every(n=>n>=8);
+    totalNota += passou ? itens.reduce((a,b)=>a+b,0)/3 : 0;
+  });
+  const mediaFinal = semDados ? null : totalNota/4;
+  const aeOk = mediaFinal!==null&&mediaFinal>=8;
+  r.areaExterna = {
+    metas:[{nome:'Limpeza/Organiz./Segurança',val:mediaFinal!==null?fmtDec(mediaFinal):'—',threshold:'Média ≥ 8',ok:aeOk,bonus:120}],
+    semDados, semanasAvaliadas:totalSemanas, mediaFinal,
+  };
+  r.areaExterna.bonus = aeOk?120:0;
+  r.areaExterna.allOk = aeOk;
+
+  // DESOSSA
+  const de = eq.desossa||{};
+  const pd = de.pedidosTotal>0 ? de.devolucoesInternas/de.pedidosTotal*100 : null;
+  r.desossa = {
+    metas:[{nome:'Devoluções Internas',val:fmtPct(pd),threshold:'≤ 2%',ok:pd!==null&&pd<=2,bonus:120}],
+    semDados:pd===null,
+  };
+  r.desossa.bonus = r.desossa.metas[0].ok?120:0;
+  r.desossa.allOk = r.desossa.metas[0].ok;
+
+  // EXPEDIÇÃO
+  const ex = eq.expedicao||{};
+  const pe = ex.pedidosTotal>0 ? ex.devolucoesInternas/ex.pedidosTotal*100 : null;
+  r.expedicao = {
+    metas:[{nome:'Devoluções Internas',val:fmtPct(pe),threshold:'≤ 10%',ok:pe!==null&&pe<=10,bonus:120}],
+    semDados:pe===null,
+  };
+  r.expedicao.bonus = r.expedicao.metas[0].ok?120:0;
+  r.expedicao.allOk = r.expedicao.metas[0].ok;
+
+  return r;
+}
+
+// ─── ICONS ───────────────────────────────────────────────────────────────────
+const Icon = {
+  dashboard: ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>,
+  lancamento: ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+  equipes: ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>,
+  historico: ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
+  check: ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>,
+  x: ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  star: ()=><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+  trash: ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>,
+  save: ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
+  plus: ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+};
+
+// ─── NOTIFY ───────────────────────────────────────────────────────────────────
+function Notify({ msg, type, onDone }) {
+  useEffect(()=>{ const t=setTimeout(onDone,2400); return ()=>clearTimeout(t); },[]);
+  return <div className="notify"><span style={{color:type==='ok'?'var(--green)':'var(--red)'}}>{type==='ok'?'✓':'✕'}</span>{msg}</div>;
+}
+
+// ─── BADGE ────────────────────────────────────────────────────────────────────
+const StatusBadge = ({ ok, semDados }) => {
+  if(semDados) return <span className="badge badge-gray">Sem dados</span>;
+  return ok
+    ? <span className="badge badge-green"><Icon.check/>Atingida</span>
+    : <span className="badge badge-red"><Icon.x/>Não atingida</span>;
+};
+
+// ─── DASHBOARD ───────────────────────────────────────────────────────────────
+function Dashboard({ mesKey, dadosMes, colaboradores, metasEq }) {
+  const empresa = calcEmpresa(dadosMes.empresa||{});
+
+  // Apenas ativos E que já completaram um mês cheio (entraram antes deste mês)
+  const collabsAtivos = colaboradores.filter(c =>
+    c.ativo !== false && colabElegivelNoMes(c, mesKey)
+  );
+  // Colaboradores novos (entrou neste mês) — para exibir aviso
+  const collabsNovos = colaboradores.filter(c =>
+    c.ativo !== false && !colabElegivelNoMes(c, mesKey)
+  );
+
+  const calcBonusColab = (c) => {
+    if(!empresa.atingida) return { total:0, indOk:false, eqOk:false, todos:false, bonusEq:0 };
+    const ind = calcIndividual((dadosMes.individual||{})[c.id]||{});
+    const eq = metasEq[c.equipe]||{};
+    const bonusEq = eq.bonus||0;
+    const total = 60 + ind.bonus + bonusEq;
+    const todos = ind.atingida && (eq.allOk||false);
+    return { total, indOk:ind.atingida, eqOk:eq.allOk||false, bonusEq, todos };
+  };
+
+  const elegiveis = collabsAtivos.filter(c=>empresa.atingida&&calcBonusColab(c).todos);
+
+  return (
+    <div>
+      {/* EMPRESA */}
+      <div className="card empresa-card mb16">
+        <div className="flex items-center justify-between mb12">
+          <div>
+            <div className="label">Meta da Empresa</div>
+            <div className="flex items-center gap8 mt4">
+              <span className="big-num" style={{color:empresa.atingida?'var(--gold2)':'var(--text3)'}}>{fmt(empresa.real)}</span>
+              <span className="c-text3" style={{fontSize:20}}>/ {fmt(empresa.meta)}</span>
+            </div>
+            <div className="fs11 c-text3 mt4">{empresa.diasUteis} dias úteis × {ANIMAIS_DIA} animais = meta {fmt(empresa.meta)}</div>
+          </div>
+          <div className="text-right">
+            <StatusBadge ok={empresa.atingida} semDados={empresa.meta===0} />
+            <div className="fs12 c-text3 mt8">
+              {empresa.meta>0 ? `${empresa.pct.toFixed(1).replace('.',',')}% da meta` : 'Sem dados'}
+            </div>
+            <div className="fs11 c-text3 mt4">Libera <span className="c-gold fw6">R$ 60</span> por colaborador</div>
+          </div>
+        </div>
+        {empresa.meta>0 && <div className="progress"><div className="progress-fill" style={{width:`${empresa.pct}%`,background:empresa.atingida?'var(--green)':'var(--gold)'}} /></div>}
+        {!empresa.atingida && empresa.meta>0 && <div style={{fontSize:12,color:'var(--red)',marginTop:8}}>⚠ Meta empresa não atingida — nenhuma bonificação será liberada</div>}
+      </div>
+
+      {/* EQUIPES */}
+      <div className="label mb12">Metas por Equipe</div>
+      <div className="grid-teams mb20">
+        {EQUIPES_IDS.map(eqId => {
+          const eq = metasEq[eqId];
+          if(!eq) return null;
+          const cor = COR_EQUIPE[eqId];
+          return (
+            <div key={eqId} className="card-sm" style={{borderTop:`2px solid ${cor}`}}>
+              <div className="flex items-center justify-between mb12">
+                <div className="fw6" style={{fontSize:14}}>{EQUIPES[eqId]}</div>
+                <StatusBadge ok={eq.allOk} semDados={eq.semDados} />
+              </div>
+              {eq.metas.map((m,i)=>(
+                <div key={i}>
+                  <div className="meta-item">
+                    <div>
+                      <div className="meta-item-label" style={{fontSize:12}}>{m.nome}</div>
+                      <div className="meta-item-sub">{m.threshold}</div>
+                      {m.sub && m.sub.map((s,j)=>(
+                        <div key={j} className="subitem mt4">
+                          <span className="fs11 c-text3">{s.nome}: <span className="mono">{s.val}</span></span>
+                          <span className={s.ok?'ok':'fail'}>{s.meta}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="meta-item-value">
+                      <div className="meta-val mono">{m.val}</div>
+                      {!m.sub && <div className="fs11 mt4" style={{color:m.ok?'var(--green)':'var(--red)'}}>{m.ok?'✓ Ok':'✕ Fora'}</div>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div className="mt8 flex items-center justify-between">
+                <span className="fs11 c-text3">Bônus equipe:</span>
+                <span className="mono fw6" style={{color:cor}}>R$ {eq.bonus}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* SORTEIO BANNER */}
+      {elegiveis.length > 0 && (
+        <div style={{background:'linear-gradient(135deg,rgba(200,144,42,0.15),rgba(232,181,64,0.08))',border:'1px solid var(--gold3)',borderRadius:12,padding:'20px 24px',marginBottom:16,display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}}>
+          <div>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,letterSpacing:1,color:'var(--gold2)',marginBottom:4}}>
+              🎉 SORTEIO LIBERADO!
+            </div>
+            <div style={{fontSize:13,color:'var(--text2)'}}>
+              <span style={{color:'var(--gold2)',fontWeight:600}}>{elegiveis.length} colaborador{elegiveis.length>1?'es':''}</span> atingiu todas as metas e está{elegiveis.length>1?'ão':''} elegível{elegiveis.length>1?'is':''} para o sorteio do mês.
+            </div>
+            <div style={{fontSize:11,color:'var(--text3)',marginTop:6}}>
+              {elegiveis.map(c=>c.nome).join(' · ')}
+            </div>
+          </div>
+          <div style={{textAlign:'right',flexShrink:0}}>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:32,color:'var(--gold2)',lineHeight:1}}>R$ 600</div>
+            <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>valor máx. do sorteio</div>
+          </div>
+        </div>
+      )}
+
+      {/* COLABORADORES */}
+      <div className="card">
+        <div className="sec-header">
+          <div className="sec-title">Colaboradores — {mesKey}</div>
+          {elegiveis.length>0 && <span className="badge badge-gold"><span className="sorteio-star"><Icon.star/></span>{elegiveis.length} elegível(is) p/ sorteio</span>}
+        </div>
+        {collabsNovos.length>0 && (
+          <div style={{background:'rgba(245,158,11,0.08)',border:'1px solid rgba(245,158,11,0.2)',borderRadius:8,padding:'8px 12px',marginBottom:12,fontSize:12,color:'var(--yellow)'}}>
+            ⚠ {collabsNovos.map(c=>c.nome).join(', ')} {collabsNovos.length>1?'entraram':'entrou'} neste mês — elegível{collabsNovos.length>1?'is':''} a partir do mês seguinte.
+          </div>
+        )}
+        {collabsAtivos.length===0
+          ? <div className="empty"><div className="empty-icon">👥</div>Nenhum colaborador cadastrado. Vá em Equipes.</div>
+          : <div className="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Colaborador</th><th>Equipe</th><th>Empresa</th><th>Individual</th><th>Equipe</th><th>Total</th><th>Sorteio</th>
+              </tr></thead>
+              <tbody>
+                {collabsAtivos.sort((a,b)=>a.equipe.localeCompare(b.equipe)).map(c=>{
+                  const b = calcBonusColab(c);
+                  return (
+                    <tr key={c.id} className={b.todos?'highlight-row':''}>
+                      <td className="fw5">{c.nome}</td>
+                      <td><span className="chip" style={{color:COR_EQUIPE[c.equipe],borderColor:COR_EQUIPE[c.equipe]+'44',background:COR_EQUIPE[c.equipe]+'0D'}}>{EQUIPES[c.equipe]||c.equipe}</span></td>
+                      <td><span style={{color:empresa.atingida?'var(--green)':'var(--red)',fontFamily:'DM Mono'}}>R$ {empresa.atingida?60:0}</span></td>
+                      <td><span style={{color:b.indOk?'var(--green)':'var(--red)',fontFamily:'DM Mono'}}>R$ {b.indOk?120:0}</span></td>
+                      <td><span style={{fontFamily:'DM Mono',color:'var(--text2)'}}>R$ {empresa.atingida?b.bonusEq:0}</span></td>
+                      <td><span className="mono fw6" style={{color:b.total>0?'var(--gold2)':'var(--text3)',fontSize:15}}>R$ {empresa.atingida?b.total:0}</span></td>
+                      <td>{empresa.atingida&&b.todos?<span className="c-gold"><Icon.star/></span>:<span className="c-text3">—</span>}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
+  );
+}
+
+// ─── LANÇAMENTO ───────────────────────────────────────────────────────────────
+function Lancamento({ mesKey, dadosMes, colaboradores, onSave }) {
+  const tabs = ['Empresa','Abate','Miúdos','Área Externa','Desossa','Expedição','Individual'];
+  const [tab, setTab] = useState(0);
+  const [local, setLocal] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(()=>{ setLocal(JSON.parse(JSON.stringify(dadosMes||{}))); },[mesKey,dadosMes]);
+
+  const set = (path, val) => {
+    setLocal(prev => {
+      const n = {...prev};
+      const parts = path.split('.');
+      let cur = n;
+      for(let i=0;i<parts.length-1;i++){
+        if(!cur[parts[i]]) cur[parts[i]]={};
+        cur=cur[parts[i]];
+      }
+      cur[parts[parts.length-1]] = val===''?'':isNaN(Number(val))?val:Number(val);
+      return n;
+    });
+  };
+
+  const get = (path, def='') => {
+    const parts = path.split('.');
+    let cur = local;
+    for(const p of parts){ if(cur===undefined||cur===null) return def; cur=cur[p]; }
+    return cur===undefined||cur===null?def:cur;
+  };
+
+  const salvar = async () => {
+    setSaving(true);
+    try {
+      await db.ref(`metafrispar/meses/${mesKey}`).set(local);
+      onSave('Dados salvos com sucesso!', 'ok');
+    } catch(e) { onSave('Erro ao salvar: '+e.message, 'err'); }
+    setSaving(false);
+  };
+
+  const inp = (path, placeholder='0') => (
+    <input type="number" min="0" value={get(path)} onChange={e=>set(path,e.target.value)} placeholder={placeholder} />
+  );
+
+  const colabsAtivos = colaboradores.filter(c=>c.ativo!==false);
+
+  return (
+    <div>
+      <div className="overflow-tabs"><div className="tabs">{tabs.map((t,i)=><div key={i} className={`tab${tab===i?' active':''}`} onClick={()=>setTab(i)}>{t}</div>)}</div></div>
+
+      {/* EMPRESA */}
+      {tab===0 && <div className="card">
+        <div className="sec-title mb16">Meta da Empresa</div>
+        <div className="grid2">
+          <div className="form-group"><div className="form-label">Dias Úteis no Mês</div>{inp('empresa.diasUteis')}</div>
+          <div className="form-group"><div className="form-label">Total Animais Abatidos</div>{inp('empresa.animaisAbatidos')}</div>
+        </div>
+        <div className="fs12 c-text3 mt4">Meta automática: {get('empresa.diasUteis',0)} dias × {ANIMAIS_DIA} = <span className="c-gold fw6">{fmt((get('empresa.diasUteis',0)||0)*ANIMAIS_DIA)} animais</span></div>
+      </div>}
+
+      {/* ABATE */}
+      {tab===1 && <div className="card">
+        <div className="sec-title mb16">Linha de Abate</div>
+        <div className="label mb8">Contaminação de Carcaças (meta ≤ 35%)</div>
+        <div className="grid2 mb16">
+          <div className="form-group"><div className="form-label">Total Carcaças no Mês</div>{inp('equipes.abate.carcacasTotal')}</div>
+          <div className="form-group"><div className="form-label">Carcaças Contaminadas</div>{inp('equipes.abate.carcacasContaminadas')}</div>
+        </div>
+        <div className="label mb8">Couro Furado (meta ≤ 10%)</div>
+        <div className="grid2">
+          <div className="form-group"><div className="form-label">Total Couros Inspecionados</div>{inp('equipes.abate.courosTotal')}</div>
+          <div className="form-group"><div className="form-label">Couros Furados</div>{inp('equipes.abate.courosFurados')}</div>
+        </div>
+        {get('equipes.abate.carcacasTotal',0)>0 && <div className="mt12 fs12 c-text2">
+          Contaminação carcaça: <span className="mono c-gold">{fmtPct(get('equipes.abate.carcacasContaminadas',0)/get('equipes.abate.carcacasTotal',1)*100)}</span> | 
+          Couro furado: <span className="mono c-gold">{fmtPct(get('equipes.abate.courosFurados',0)/get('equipes.abate.courosTotal',1)*100)}</span>
+        </div>}
+      </div>}
+
+      {/* MIÚDOS */}
+      {tab===2 && <div className="card">
+        <div className="sec-title mb16">Miúdos</div>
+        <div className="label mb8">Contaminação — Línguas (meta = 0%)</div>
+        <div className="grid2 mb12">
+          <div className="form-group"><div className="form-label">Total Línguas</div>{inp('equipes.miudos.linguasTotal')}</div>
+          <div className="form-group"><div className="form-label">Línguas Contaminadas</div>{inp('equipes.miudos.linguasContaminadas')}</div>
+        </div>
+        <div className="label mb8">Contaminação — Corações (meta = 0%)</div>
+        <div className="grid2 mb12">
+          <div className="form-group"><div className="form-label">Total Corações</div>{inp('equipes.miudos.coracoesTotal')}</div>
+          <div className="form-group"><div className="form-label">Corações Contaminados</div>{inp('equipes.miudos.coracoesContaminados')}</div>
+        </div>
+        <div className="label mb8">Contaminação — Rúmens (meta ≤ 8%)</div>
+        <div className="grid2 mb12">
+          <div className="form-group"><div className="form-label">Total Rúmens</div>{inp('equipes.miudos.rumensTotal')}</div>
+          <div className="form-group"><div className="form-label">Rúmens Contaminados</div>{inp('equipes.miudos.rumensContaminados')}</div>
+        </div>
+        <div className="label mb8">Carne de Cabeça (meta ≥ 2,6 kg/animal)</div>
+        <div className="grid2">
+          <div className="form-group"><div className="form-label">Total de Animais</div>{inp('equipes.miudos.animaisTotal')}</div>
+          <div className="form-group"><div className="form-label">Total Kg Carne de Cabeça</div>{inp('equipes.miudos.kgCarne')}</div>
+        </div>
+        {get('equipes.miudos.animaisTotal',0)>0 && <div className="mt12 fs12 c-text2">
+          Média carne: <span className="mono c-gold">{fmtDec((get('equipes.miudos.kgCarne',0)||0)/(get('equipes.miudos.animaisTotal',1)||1))} kg/animal</span>
+        </div>}
+      </div>}
+
+      {/* ÁREA EXTERNA */}
+      {tab===3 && <div className="card">
+        <div className="sec-title mb4">Área Externa</div>
+        <div className="fs12 c-text3 mb16">Avaliação semanal — nota 0 a 10. Se qualquer item {'<'} 8, a semana não pontua. Média final do mês ≥ 8.</div>
+        <div className="week-grid">
+          {[1,2,3,4].map(i => {
+            const limp=get(`equipes.areaExterna.semanas.${i}.limpeza`,'')||'';
+            const org=get(`equipes.areaExterna.semanas.${i}.organizacao`,'')||'';
+            const seg=get(`equipes.areaExterna.semanas.${i}.seguranca`,'')||'';
+            const itens=[Number(limp)||0,Number(org)||0,Number(seg)||0];
+            const temDados=limp!==''||org!==''||seg!=='';
+            const passou=temDados&&itens.every(n=>n>=8);
+            return (
+              <div key={i} className="week-card" style={temDados?{borderColor:passou?'var(--green)':'var(--red)'}:{}}>
+                <div className="flex items-center justify-between mb8">
+                  <div className="week-title">Semana {i}</div>
+                  {temDados && <span className="badge" style={{background:passou?'rgba(34,197,94,.12)':'rgba(239,68,68,.12)',color:passou?'var(--green)':'var(--red)',border:`1px solid ${passou?'rgba(34,197,94,.2)':'rgba(239,68,68,.2)'}`}}>{passou?'Válida':'Nula'}</span>}
+                </div>
+                <div className="week-inputs">
+                  <div className="week-row"><span className="week-row-label">Limpeza</span><input type="number" min="0" max="10" value={limp} onChange={e=>set(`equipes.areaExterna.semanas.${i}.limpeza`,e.target.value)} placeholder="0–10"/></div>
+                  <div className="week-row"><span className="week-row-label">Organização</span><input type="number" min="0" max="10" value={org} onChange={e=>set(`equipes.areaExterna.semanas.${i}.organizacao`,e.target.value)} placeholder="0–10"/></div>
+                  <div className="week-row"><span className="week-row-label">Segurança</span><input type="number" min="0" max="10" value={seg} onChange={e=>set(`equipes.areaExterna.semanas.${i}.seguranca`,e.target.value)} placeholder="0–10"/></div>
+                </div>
+                {temDados && <div className="fs11 c-text3 mt8">Média: <span className="mono">{(itens.reduce((a,b)=>a+b,0)/3).toFixed(1).replace('.',',')}</span></div>}
+              </div>
+            );
+          })}
+        </div>
+      </div>}
+
+      {/* DESOSSA */}
+      {tab===4 && <div className="card">
+        <div className="sec-title mb16">Desossa</div>
+        <div className="fs12 c-text3 mb16">Meta: Devoluções por falha interna ≤ 2% — Histórico: Set/10%, Out/8,7%, Nov/4,7%</div>
+        <div className="grid2">
+          <div className="form-group"><div className="form-label">Total de Pedidos Expedidos</div>{inp('equipes.desossa.pedidosTotal')}</div>
+          <div className="form-group"><div className="form-label">Devoluções por Falha Interna</div>{inp('equipes.desossa.devolucoesInternas')}</div>
+        </div>
+        {get('equipes.desossa.pedidosTotal',0)>0 && <div className="mt8 fs12 c-text2">
+          Taxa atual: <span className="mono c-gold">{fmtPct((get('equipes.desossa.devolucoesInternas',0)||0)/(get('equipes.desossa.pedidosTotal',1)||1)*100)}</span>
+        </div>}
+        <div className="divider"/>
+        <div className="label mb8">Falhas Internas (para referência)</div>
+        <div className="fs12 c-text3">Produto trocado · Vencido · Embalagem sem vácuo · Impróprio p/ consumo · Fora do padrão · Etiqueta errada · Classificação errada</div>
+      </div>}
+
+      {/* EXPEDIÇÃO */}
+      {tab===5 && <div className="card">
+        <div className="sec-title mb16">Expedição</div>
+        <div className="fs12 c-text3 mb16">Meta: Devoluções por falha interna ≤ 10% — Histórico: Jun/42%, Jul/34%, Ago/29%, Set/21%</div>
+        <div className="grid2">
+          <div className="form-group"><div className="form-label">Total de Pedidos Expedidos</div>{inp('equipes.expedicao.pedidosTotal')}</div>
+          <div className="form-group"><div className="form-label">Devoluções por Falha Interna</div>{inp('equipes.expedicao.devolucoesInternas')}</div>
+        </div>
+        {get('equipes.expedicao.pedidosTotal',0)>0 && <div className="mt8 fs12 c-text2">
+          Taxa atual: <span className="mono c-gold">{fmtPct((get('equipes.expedicao.devolucoesInternas',0)||0)/(get('equipes.expedicao.pedidosTotal',1)||1)*100)}</span>
+        </div>}
+        <div className="divider"/>
+        <div className="label mb8">Falhas Internas (para referência)</div>
+        <div className="fs12 c-text3">Produto não carregado · Mercadoria errada · Erro de pesagem · Enviado a mais · Carregado sem bipar</div>
+      </div>}
+
+      {/* INDIVIDUAL */}
+      {tab===6 && <div className="card">
+        <div className="sec-title mb4">Metas Individuais</div>
+        <div className="fs12 c-text3 mb16">Meta: 0 faltas + 0 atestados + 0 advertências = R$ 120. Preencha ao fechar o mês.</div>
+        {colabsAtivos.length===0
+          ? <div className="empty"><div className="empty-icon">👥</div>Cadastre colaboradores em Equipes primeiro.</div>
+          : colabsAtivos.sort((a,b)=>a.equipe.localeCompare(b.equipe)).map(c=>(
+            <div key={c.id} className="collab-row">
+              <div>
+                <div className="collab-name">{c.nome}</div>
+                <div className="collab-team">{EQUIPES[c.equipe]||c.equipe}</div>
+              </div>
+              <div className="collab-inputs">
+                {[['Faltas',`individual.${c.id}.faltas`],['Atestados',`individual.${c.id}.atestados`],['Advertências',`individual.${c.id}.advertencias`]].map(([label,path])=>(
+                  <div key={label} className="collab-input-wrap">
+                    <span>{label}</span>
+                    <input type="number" min="0" value={get(path,0)} onChange={e=>set(path,e.target.value)} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        }
+      </div>}
+
+      <div className="mt20">
+        <button className="btn btn-gold" onClick={salvar} disabled={saving}>
+          <Icon.save/>{saving?'Salvando…':'Salvar dados do mês'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── EQUIPES ──────────────────────────────────────────────────────────────────
+function Equipes({ colaboradores, onSave }) {
+  const [nome, setNome] = useState('');
+  const [equipe, setEquipe] = useState('abate');
+  const [dataEntrada, setDataEntrada] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const adicionar = async () => {
+    if(!nome.trim()) return;
+    setSaving(true);
+    try {
+      const id = Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+      await db.ref(`metafrispar/colaboradores/${id}`).set({ id, nome:nome.trim(), equipe, dataEntrada: dataEntrada||null, ativo:true });
+      setNome(''); setDataEntrada('');
+      onSave('Colaborador adicionado!','ok');
+    } catch(e){ onSave('Erro: '+e.message,'err'); }
+    setSaving(false);
+  };
+
+  const toggleAtivo = async (c) => {
+    await db.ref(`metafrispar/colaboradores/${c.id}/ativo`).set(!(c.ativo!==false));
+  };
+
+  const remover = async (c) => {
+    if(!window.confirm(`Remover ${c.nome}? Isso não afeta dados históricos.`)) return;
+    await db.ref(`metafrispar/colaboradores/${c.id}`).remove();
+    onSave('Colaborador removido.','ok');
+  };
+
+  const grupos = {};
+  EQUIPES_IDS.forEach(e=>grupos[e]=[]);
+  colaboradores.forEach(c=>{ if(grupos[c.equipe]) grupos[c.equipe].push(c); });
+
+  return (
+    <div>
+      <div className="card mb20">
+        <div className="sec-title mb16">Adicionar Colaborador</div>
+        <div className="grid2">
+          <div className="form-group"><div className="form-label">Nome Completo</div>
+            <input type="text" value={nome} onChange={e=>setNome(e.target.value)} placeholder="Nome do colaborador" onKeyDown={e=>e.key==='Enter'&&adicionar()} />
+          </div>
+          <div className="form-group"><div className="form-label">Equipe</div>
+            <select value={equipe} onChange={e=>setEquipe(e.target.value)}>
+              {EQUIPES_IDS.map(e=><option key={e} value={e}>{EQUIPES[e]}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="form-group" style={{maxWidth:240}}>
+          <div className="form-label">Data de Entrada</div>
+          <input type="date" value={dataEntrada} onChange={e=>setDataEntrada(e.target.value)} />
+          <div className="fs11 c-text3 mt4">Colaboradores que entram no meio do mês só participam a partir do mês seguinte.</div>
+        </div>
+        <button className="btn btn-gold btn-sm" onClick={adicionar} disabled={saving||!nome.trim()}>
+          <Icon.plus/>{saving?'Adicionando…':'Adicionar'}
+        </button>
+      </div>
+
+      {EQUIPES_IDS.map(eqId=>{
+        const grupo = grupos[eqId]||[];
+        const cor = COR_EQUIPE[eqId];
+        return (
+          <div key={eqId} className="card mb16">
+            <div className="flex items-center justify-between mb12">
+              <div className="flex items-center gap8">
+                <div style={{width:10,height:10,borderRadius:'50%',background:cor,flexShrink:0}}/>
+                <div className="sec-title" style={{fontSize:16}}>{EQUIPES[eqId]}</div>
+              </div>
+              <span className="chip">{grupo.filter(c=>c.ativo!==false).length} ativos</span>
+            </div>
+            {grupo.length===0
+              ? <div className="fs12 c-text3">Nenhum colaborador nesta equipe.</div>
+              : grupo.map(c=>(
+                <div key={c.id} className="flex items-center justify-between" style={{padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
+                  <div>
+                    <div className="fw5 fs12" style={{color:c.ativo!==false?'var(--text)':'var(--text3)'}}>{c.nome}</div>
+                    <div className="fs11 c-text3">{c.dataEntrada ? `Entrada: ${c.dataEntrada}` : 'Sem data cadastrada'}</div>
+                    {c.ativo===false && <span className="badge badge-gray" style={{fontSize:10}}>Inativo</span>}
+                  </div>
+                  <div className="flex gap8">
+                    <button className="btn btn-ghost btn-sm" onClick={()=>toggleAtivo(c)}>{c.ativo!==false?'Desativar':'Ativar'}</button>
+                    <button className="btn btn-red btn-sm" onClick={()=>remover(c)}><Icon.trash/></button>
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── HISTÓRICO ───────────────────────────────────────────────────────────────
+function Historico({ todosMeses }) {
+  const mesesOrdenados = Object.keys(todosMeses).sort().reverse().slice(0,12);
+
+  if(mesesOrdenados.length===0)
+    return <div className="empty mt20"><div className="empty-icon">📊</div>Nenhum dado histórico ainda. Lance dados para os meses anteriores.</div>;
+
+  const eqs = EQUIPES_IDS;
+
+  return (
+    <div className="card">
+      <div className="sec-title mb16">Histórico de Metas — Últimos {mesesOrdenados.length} meses</div>
+      <div className="table-wrap">
+        <table className="hist-table">
+          <thead>
+            <tr>
+              <th>Mês</th>
+              <th>Empresa</th>
+              <th>Animais</th>
+              {eqs.map(e=><th key={e}>{EQUIPES[e]}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {mesesOrdenados.map(mk=>{
+              const d = todosMeses[mk]||{};
+              const emp = calcEmpresa(d.empresa||{});
+              const meq = calcEquipes(d.equipes||{});
+              const [ano,mesNum] = mk.split('-');
+              const mesNome = MESES[parseInt(mesNum)-1];
+              return (
+                <tr key={mk}>
+                  <td className="fw6 mono" style={{whiteSpace:'nowrap'}}>{mesNome}/{ano}</td>
+                  <td>
+                    {emp.meta===0
+                      ? <span className="c-text3">—</span>
+                      : <span style={{color:emp.atingida?'var(--green)':'var(--red)',fontFamily:'DM Mono',fontSize:12}}>
+                          {fmt(emp.real)}/{fmt(emp.meta)}
+                        </span>
+                    }
+                  </td>
+                  <td><span className="mono fs12">{emp.meta>0?`${emp.pct.toFixed(0)}%`:'—'}</span></td>
+                  {eqs.map(e=>{
+                    const er = meq[e];
+                    return <td key={e}>
+                      {er.semDados
+                        ? <span className="c-text3">—</span>
+                        : <span style={{color:er.allOk?'var(--green)':'var(--red)',fontSize:12}}>
+                            {er.allOk?'✓ R$'+er.bonus:'✕ R$'+er.bonus}
+                          </span>
+                      }
+                    </td>;
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt16 fs11 c-text3">O valor mostrado em cada equipe é o bônus gerado (independente da meta empresa). A bonificação final depende da meta empresa ter sido atingida.</div>
+    </div>
+  );
+}
+
+// ─── APP ──────────────────────────────────────────────────────────────────────
+function App() {
+  const [page, setPage] = useState('dashboard');
+  const [mes, setMes] = useState({ ano: now.getFullYear(), mes: now.getMonth() });
+  const [dadosMes, setDadosMes] = useState({});
+  const [colaboradores, setColabs] = useState([]);
+  const [todosMeses, setTodosMeses] = useState({});
+  const [loadingMes, setLoadingMes] = useState(false);
+  const [notify, setNotify] = useState(null);
+
+  const mesKey = getMesKey(mes.ano, mes.mes);
+  const tituloMes = `${MESES[mes.mes]} ${mes.ano}`;
+
+  // Firebase: colaboradores
+  useEffect(()=>{
+    const ref = db.ref('metafrispar/colaboradores');
+    const cb = snap => {
+      const val = snap.val()||{};
+      setColabs(Object.values(val).sort((a,b)=>a.nome.localeCompare(b.nome)));
+    };
+    ref.on('value', cb);
+    return ()=>ref.off('value', cb);
+  },[]);
+
+  // Firebase: dados do mês corrente
+  useEffect(()=>{
+    setLoadingMes(true);
+    const ref = db.ref(`metafrispar/meses/${mesKey}`);
+    const cb = snap => { setDadosMes(snap.val()||{}); setLoadingMes(false); };
+    ref.on('value', cb);
+    return ()=>ref.off('value', cb);
+  },[mesKey]);
+
+  // Firebase: todos os meses (para histórico)
+  useEffect(()=>{
+    const ref = db.ref('metafrispar/meses');
+    const cb = snap => setTodosMeses(snap.val()||{});
+    ref.on('value', cb);
+    return ()=>ref.off('value', cb);
+  },[]);
+
+  const navMes = dir => {
+    setMes(prev=>{
+      let nm = prev.mes+dir, na = prev.ano;
+      if(nm<0){nm=11;na--;}
+      if(nm>11){nm=0;na++;}
+      return {ano:na, mes:nm};
+    });
+  };
+
+  const metasEq = calcEquipes(dadosMes.equipes||{});
+
+  const pageTitles = { dashboard:'Dashboard', lancamento:'Lançamento de Dados', equipes:'Gestão de Equipes', historico:'Histórico' };
+  const navItems = [
+    { id:'dashboard', label:'Dashboard', icon:<Icon.dashboard/> },
+    { id:'lancamento', label:'Lançar Dados', icon:<Icon.lancamento/> },
+    { id:'equipes', label:'Equipes', icon:<Icon.equipes/> },
+    { id:'historico', label:'Histórico', icon:<Icon.historico/> },
+  ];
+
+  const showMesSel = page==='dashboard'||page==='lancamento';
+
+  return (
+    <>
+      <div className="sidebar">
+        <div className="sb-logo">
+          <h1>META+<br/>FRISPAR</h1>
+          <span>Programa de Metas</span>
+        </div>
+        <nav className="sb-nav">
+          {navItems.map(n=>(
+            <div key={n.id} className={`sb-item${page===n.id?' active':''}`} onClick={()=>setPage(n.id)}>
+              {n.icon}{n.label}
+            </div>
+          ))}
+        </nav>
+        <div className="sb-foot">
+          Frispar · Frigorífico<br/>Sudoeste do Paraná
+        </div>
+      </div>
+
+      <div className="main">
+        <div className="topbar">
+          <div className="topbar-title">{pageTitles[page]||''}</div>
+          {showMesSel && (
+            <div className="month-sel">
+              <button className="month-btn" onClick={()=>navMes(-1)}>‹</button>
+              <div className="month-label">{tituloMes}</div>
+              <button className="month-btn" onClick={()=>navMes(1)}>›</button>
+            </div>
+          )}
+        </div>
+
+        <div className="content">
+          {loadingMes&&(page==='dashboard'||page==='lancamento')
+            ? <div className="loading">Carregando dados…</div>
+            : <>
+              {page==='dashboard' && <Dashboard mesKey={mesKey} dadosMes={dadosMes} colaboradores={colaboradores} metasEq={metasEq}/>}
+              {page==='lancamento' && <Lancamento mesKey={mesKey} dadosMes={dadosMes} colaboradores={colaboradores} onSave={(m,t)=>setNotify({m,t})}/>}
+              {page==='equipes' && <Equipes colaboradores={colaboradores} onSave={(m,t)=>setNotify({m,t})}/>}
+              {page==='historico' && <Historico todosMeses={todosMeses}/>}
+            </>
+          }
+        </div>
+      </div>
+
+      {notify && <Notify msg={notify.m} type={notify.t} onDone={()=>setNotify(null)}/>}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
