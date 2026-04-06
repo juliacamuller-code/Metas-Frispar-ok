@@ -37,7 +37,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
 .sb-foot{padding:12px 12px 0;border-top:1px solid var(--border);font-size:11px;color:var(--text3)}
 /* MAIN */
 .main{flex:1;overflow:auto;display:flex;flex-direction:column;min-width:0}
-.topbar{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg2);position:sticky;top:0;z-index:10}
+.topbar{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--bg2);position:sticky;top:0;z-index:10}
 .topbar-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.5px;color:var(--text)}
 .month-sel{display:flex;align-items:center;gap:8px}
 .month-btn{background:var(--bg3);border:1px solid var(--border);color:var(--text2);width:28px;height:28px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .15s}
@@ -149,6 +149,31 @@ select option{background:var(--bg3)}
   .sidebar{display:none}
   .grid3,.grid2{grid-template-columns:1fr}
   .week-grid{grid-template-columns:1fr}
+  .grid-teams{grid-template-columns:1fr}
+  .content{padding:12px;padding-bottom:80px}
+  .topbar{padding:9px 12px;gap:8px}
+  .topbar-title{font-size:16px}
+  .month-label{min-width:100px;font-size:11px}
+  input[type=number],input[type=text],input[type=date],select{
+    font-size:16px;padding:10px 12px;min-height:44px
+  }
+  .collab-row{flex-direction:column;align-items:flex-start;gap:8px;padding:12px}
+  .collab-inputs{flex-wrap:wrap;gap:10px;width:100%}
+  .collab-input-wrap{flex:1;min-width:80px}
+  .collab-input-wrap input{width:100%}
+  .tabs{gap:0}
+  .tab{padding:8px 10px;font-size:12px}
+  .btn{min-height:44px;font-size:14px}
+  .week-row-label{width:90px}
+  .card{padding:14px}
+  .sec-title{font-size:16px}
+}
+.mobile-nav{display:none}
+@media(max-width:768px){
+  .mobile-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);z-index:20;padding:6px 0 env(safe-area-inset-bottom,10px)}
+  .mobile-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;padding:4px 0;color:var(--text3);font-size:10px;font-weight:500;transition:color .12s}
+  .mobile-nav-item.active{color:var(--gold2)}
+  .mobile-nav-icon{font-size:20px;line-height:1}
 }
 /* DIVIDER */
 .divider{height:1px;background:var(--border);margin:16px 0}
@@ -185,6 +210,26 @@ const EQUIPES = { abate:'Linha de Abate', miudos:'Miúdos', areaExterna:'Área E
 const EQUIPES_IDS = Object.keys(EQUIPES);
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const ANIMAIS_DIA = 140;
+
+// ─── CONFIG PADRÃO (editável na página Configurações) ─────────────────────────
+const DEFAULT_CONFIG = {
+  bonusEmpresa: 60,
+  bonusIndividual: 120,
+  abate:      { carcacaMax:35, couroMax:10, bonus:120 },
+  miudos:     { rumensMax:8, carneMin:2.6, bonus:120 },
+  areaExterna:{ mediaMin:8, bonus:120 },
+  desossa:    { pctMax:2, bonus:120 },
+  expedicao:  { pctMax:10, bonus:120 },
+};
+const mergeConfig = (saved={}) => ({
+  bonusEmpresa:        saved.bonusEmpresa        ?? DEFAULT_CONFIG.bonusEmpresa,
+  bonusIndividual:     saved.bonusIndividual      ?? DEFAULT_CONFIG.bonusIndividual,
+  abate:      { ...DEFAULT_CONFIG.abate,      ...(saved.abate||{}) },
+  miudos:     { ...DEFAULT_CONFIG.miudos,     ...(saved.miudos||{}) },
+  areaExterna:{ ...DEFAULT_CONFIG.areaExterna,...(saved.areaExterna||{}) },
+  desossa:    { ...DEFAULT_CONFIG.desossa,    ...(saved.desossa||{}) },
+  expedicao:  { ...DEFAULT_CONFIG.expedicao,  ...(saved.expedicao||{}) },
+});
 const COR_EQUIPE = { abate:'#C8902A', miudos:'#6366F1', areaExterna:'#22C55E', desossa:'#F59E0B', expedicao:'#EF4444' };
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -208,46 +253,52 @@ function calcEmpresa(d = {}) {
   return { meta, real, diasUteis: d.diasUteis||0, atingida, pct: meta > 0 ? Math.min(100, real/meta*100) : 0 };
 }
 
-function calcIndividual(d = {}) {
+function calcIndividual(d = {}, cfg = DEFAULT_CONFIG) {
   const { faltas=0, atestados=0, advertencias=0 } = d;
   const ok = faltas===0 && atestados===0 && advertencias===0;
-  return { faltas, atestados, advertencias, atingida: ok, bonus: ok?120:0 };
+  const bonus = cfg.bonusIndividual ?? 120;
+  return { faltas, atestados, advertencias, atingida: ok, bonus: ok?bonus:0 };
 }
 
-function calcEquipes(eq = {}) {
+function calcEquipes(eq = {}, cfg = DEFAULT_CONFIG) {
   const r = {};
+  const c = mergeConfig(cfg);
 
-  // ABATE
+  // ABATE — bônus proporcional: cada meta vale metade do bônus total
   const ab = eq.abate||{};
   const pc = ab.carcacasTotal>0 ? ab.carcacasContaminadas/ab.carcacasTotal*100 : null;
   const pco = ab.courosTotal>0 ? ab.courosFurados/ab.courosTotal*100 : null;
+  const abBonusUnit = Math.round(c.abate.bonus/2);
   r.abate = {
     metas: [
-      { nome:'Contaminação Carcaça', val: fmtPct(pc), threshold:'≤ 35%', ok: pc!==null&&pc<=35, bonus:60 },
-      { nome:'Couro Furado', val: fmtPct(pco), threshold:'≤ 10%', ok: pco!==null&&pco<=10, bonus:60 },
-    ], semDados: pc===null,
+      { nome:'Contaminação Carcaça', val:fmtPct(pc), threshold:`≤ ${c.abate.carcacaMax}%`, ok:pc!==null&&pc<=c.abate.carcacaMax, bonus:abBonusUnit },
+      { nome:'Couro Furado',         val:fmtPct(pco),threshold:`≤ ${c.abate.couroMax}%`,   ok:pco!==null&&pco<=c.abate.couroMax, bonus:abBonusUnit },
+    ], semDados:pc===null,
   };
   r.abate.bonus = r.abate.metas.reduce((a,m)=>a+(m.ok?m.bonus:0),0);
   r.abate.allOk = r.abate.metas.every(m=>m.ok);
 
-  // MIÚDOS
+  // MIÚDOS — bônus proporcional: cada meta vale metade do bônus total
   const mi = eq.miudos||{};
-  const pl = mi.linguasTotal>0 ? mi.linguasContaminadas/mi.linguasTotal*100 : null;
-  const pc2 = mi.coracoesTotal>0 ? mi.coracoesContaminados/mi.coracoesTotal*100 : null;
-  const pr = mi.rumensTotal>0 ? mi.rumensContaminados/mi.rumensTotal*100 : null;
-  const mc = mi.animaisTotal>0 ? mi.kgCarne/mi.animaisTotal : null;
-  const contamOk = pl!==null&&pc2!==null&&pr!==null&&pl===0&&pc2===0&&pr<=8;
+  const pl  = mi.linguasTotal>0   ? mi.linguasContaminadas/mi.linguasTotal*100   : null;
+  const pc2 = mi.coracoesTotal>0  ? mi.coracoesContaminados/mi.coracoesTotal*100 : null;
+  const pr  = mi.rumensTotal>0    ? mi.rumensContaminados/mi.rumensTotal*100      : null;
+  const mc  = mi.animaisTotal>0   ? mi.kgCarne/mi.animaisTotal                   : null;
+  const contamOk = pl!==null&&pc2!==null&&pr!==null&&pl===0&&pc2===0&&pr<=c.miudos.rumensMax;
+  const miBonusUnit = Math.round(c.miudos.bonus/2);
   r.miudos = {
     metas: [
-      { nome:'Contaminação Miúdos', val: pl!==null?`L:${fmtPct(pl)} C:${fmtPct(pc2)} R:${fmtPct(pr)}`:'—',
-        threshold:'Língua+Cor.=0%, Rúmens≤8%', ok:contamOk, bonus:60,
-        sub: pl!==null?[
-          {nome:'Línguas',val:fmtPct(pl),meta:'0%',ok:pl===0},
-          {nome:'Corações',val:fmtPct(pc2),meta:'0%',ok:pc2===0},
-          {nome:'Rúmens',val:fmtPct(pr),meta:'≤ 8%',ok:pr!==null&&pr<=8},
+      { nome:'Contaminação Miúdos', val:pl!==null?`L:${fmtPct(pl)} C:${fmtPct(pc2)} R:${fmtPct(pr)}`:'—',
+        threshold:`Língua+Cor.=0%, Rúmens≤${c.miudos.rumensMax}%`, ok:contamOk, bonus:miBonusUnit,
+        sub:pl!==null?[
+          {nome:'Línguas',  val:fmtPct(pl),  meta:'0%',                          ok:pl===0},
+          {nome:'Corações', val:fmtPct(pc2), meta:'0%',                          ok:pc2===0},
+          {nome:'Rúmens',   val:fmtPct(pr),  meta:`≤ ${c.miudos.rumensMax}%`,    ok:pr!==null&&pr<=c.miudos.rumensMax},
         ]:null },
-      { nome:'Carne de Cabeça', val: mc!==null?fmtDec(mc)+' kg/animal':'—', threshold:'≥ 2,6 kg/animal', ok:mc!==null&&mc>=2.6, bonus:60 },
-    ], semDados: pl===null,
+      { nome:'Carne de Cabeça', val:mc!==null?fmtDec(mc)+' kg/animal':'—',
+        threshold:`≥ ${String(c.miudos.carneMin).replace('.',',')} kg/animal`,
+        ok:mc!==null&&mc>=c.miudos.carneMin, bonus:miBonusUnit },
+    ], semDados:pl===null,
   };
   r.miudos.bonus = r.miudos.metas.reduce((a,m)=>a+(m.ok?m.bonus:0),0);
   r.miudos.allOk = r.miudos.metas.every(m=>m.ok);
@@ -256,40 +307,44 @@ function calcEquipes(eq = {}) {
   const ae = (eq.areaExterna||{}).semanas||{};
   let totalNota=0, totalSemanas=0, semDados=true;
   [1,2,3,4].forEach(i=>{
-    const s=ae[i];
-    if(!s) return;
+    const s=ae[i]; if(!s) return;
     semDados=false; totalSemanas++;
     const itens=[s.limpeza||0,s.organizacao||0,s.seguranca||0];
     const passou=itens.every(n=>n>=8);
     totalNota += passou ? itens.reduce((a,b)=>a+b,0)/3 : 0;
   });
   const mediaFinal = semDados ? null : totalNota/4;
-  const aeOk = mediaFinal!==null&&mediaFinal>=8;
+  const aeOk = mediaFinal!==null&&mediaFinal>=c.areaExterna.mediaMin;
   r.areaExterna = {
-    metas:[{nome:'Limpeza/Organiz./Segurança',val:mediaFinal!==null?fmtDec(mediaFinal):'—',threshold:'Média ≥ 8',ok:aeOk,bonus:120}],
+    metas:[{nome:'Limpeza/Organiz./Segurança',val:mediaFinal!==null?fmtDec(mediaFinal):'—',
+      threshold:`Média ≥ ${c.areaExterna.mediaMin}`,ok:aeOk,bonus:c.areaExterna.bonus}],
     semDados, semanasAvaliadas:totalSemanas, mediaFinal,
   };
-  r.areaExterna.bonus = aeOk?120:0;
+  r.areaExterna.bonus = aeOk?c.areaExterna.bonus:0;
   r.areaExterna.allOk = aeOk;
 
-  // DESOSSA
+  // DESOSSA — % = devoluções por falha interna ÷ total de devoluções
   const de = eq.desossa||{};
-  const pd = de.pedidosTotal>0 ? de.devolucoesInternas/de.pedidosTotal*100 : null;
+  const pd = de.totalDevolucoes>0 ? (de.devolucoesInternas||0)/de.totalDevolucoes*100 : null;
   r.desossa = {
-    metas:[{nome:'Devoluções Internas',val:fmtPct(pd),threshold:'≤ 2%',ok:pd!==null&&pd<=2,bonus:120}],
+    metas:[{nome:'Devoluções por falha interna',val:fmtPct(pd),
+      threshold:`≤ ${c.desossa.pctMax}%`,ok:pd!==null&&pd<=c.desossa.pctMax,bonus:c.desossa.bonus}],
     semDados:pd===null,
+    totalVendas:de.totalVendas||0, totalDevolucoes:de.totalDevolucoes||0, devolucoesInternas:de.devolucoesInternas||0,
   };
-  r.desossa.bonus = r.desossa.metas[0].ok?120:0;
+  r.desossa.bonus = r.desossa.metas[0].ok?c.desossa.bonus:0;
   r.desossa.allOk = r.desossa.metas[0].ok;
 
-  // EXPEDIÇÃO
+  // EXPEDIÇÃO — % = devoluções por falha interna ÷ total de devoluções
   const ex = eq.expedicao||{};
-  const pe = ex.pedidosTotal>0 ? ex.devolucoesInternas/ex.pedidosTotal*100 : null;
+  const pe = ex.totalDevolucoes>0 ? (ex.devolucoesInternas||0)/ex.totalDevolucoes*100 : null;
   r.expedicao = {
-    metas:[{nome:'Devoluções Internas',val:fmtPct(pe),threshold:'≤ 10%',ok:pe!==null&&pe<=10,bonus:120}],
+    metas:[{nome:'Devoluções por falha interna',val:fmtPct(pe),
+      threshold:`≤ ${c.expedicao.pctMax}%`,ok:pe!==null&&pe<=c.expedicao.pctMax,bonus:c.expedicao.bonus}],
     semDados:pe===null,
+    totalVendas:ex.totalVendas||0, totalDevolucoes:ex.totalDevolucoes||0, devolucoesInternas:ex.devolucoesInternas||0,
   };
-  r.expedicao.bonus = r.expedicao.metas[0].ok?120:0;
+  r.expedicao.bonus = r.expedicao.metas[0].ok?c.expedicao.bonus:0;
   r.expedicao.allOk = r.expedicao.metas[0].ok;
 
   return r;
@@ -324,7 +379,7 @@ const StatusBadge = ({ ok, semDados }) => {
 };
 
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
-function Dashboard({ mesKey, dadosMes, colaboradores, metasEq }) {
+function Dashboard({ mesKey, dadosMes, colaboradores, metasEq, config=DEFAULT_CONFIG }) {
   const empresa = calcEmpresa(dadosMes.empresa||{});
 
   // Apenas ativos E que já completaram um mês cheio (entraram antes deste mês)
@@ -338,10 +393,10 @@ function Dashboard({ mesKey, dadosMes, colaboradores, metasEq }) {
 
   const calcBonusColab = (c) => {
     if(!empresa.atingida) return { total:0, indOk:false, eqOk:false, todos:false, bonusEq:0 };
-    const ind = calcIndividual((dadosMes.individual||{})[c.id]||{});
+    const ind = calcIndividual((dadosMes.individual||{})[c.id]||{}, config);
     const eq = metasEq[c.equipe]||{};
     const bonusEq = eq.bonus||0;
-    const total = 60 + ind.bonus + bonusEq;
+    const total = (config.bonusEmpresa??60) + ind.bonus + bonusEq;
     const todos = ind.atingida && (eq.allOk||false);
     return { total, indOk:ind.atingida, eqOk:eq.allOk||false, bonusEq, todos };
   };
@@ -461,7 +516,7 @@ function Dashboard({ mesKey, dadosMes, colaboradores, metasEq }) {
                     <tr key={c.id} className={b.todos?'highlight-row':''}>
                       <td className="fw5">{c.nome}</td>
                       <td><span className="chip" style={{color:COR_EQUIPE[c.equipe],borderColor:COR_EQUIPE[c.equipe]+'44',background:COR_EQUIPE[c.equipe]+'0D'}}>{EQUIPES[c.equipe]||c.equipe}</span></td>
-                      <td><span style={{color:empresa.atingida?'var(--green)':'var(--red)',fontFamily:'DM Mono'}}>R$ {empresa.atingida?60:0}</span></td>
+                      <td><span style={{color:empresa.atingida?'var(--green)':'var(--red)',fontFamily:'DM Mono'}}>R$ {empresa.atingida?(config.bonusEmpresa??60):0}</span></td>
                       <td><span style={{color:b.indOk?'var(--green)':'var(--red)',fontFamily:'DM Mono'}}>R$ {b.indOk?120:0}</span></td>
                       <td><span style={{fontFamily:'DM Mono',color:'var(--text2)'}}>R$ {empresa.atingida?b.bonusEq:0}</span></td>
                       <td><span className="mono fw6" style={{color:b.total>0?'var(--gold2)':'var(--text3)',fontSize:15}}>R$ {empresa.atingida?b.total:0}</span></td>
@@ -479,7 +534,7 @@ function Dashboard({ mesKey, dadosMes, colaboradores, metasEq }) {
 }
 
 // ─── LANÇAMENTO ───────────────────────────────────────────────────────────────
-function Lancamento({ mesKey, dadosMes, colaboradores, onSave }) {
+function Lancamento({ mesKey, dadosMes, colaboradores, config=DEFAULT_CONFIG, onSave }) {
   const tabs = ['Empresa','Abate','Miúdos','Área Externa','Desossa','Expedição','Individual'];
   const [tab, setTab] = useState(0);
   const [local, setLocal] = useState({});
@@ -616,34 +671,38 @@ function Lancamento({ mesKey, dadosMes, colaboradores, onSave }) {
 
       {/* DESOSSA */}
       {tab===4 && <div className="card">
-        <div className="sec-title mb16">Desossa</div>
-        <div className="fs12 c-text3 mb16">Meta: Devoluções por falha interna ≤ 2% — Histórico: Set/10%, Out/8,7%, Nov/4,7%</div>
-        <div className="grid2">
-          <div className="form-group"><div className="form-label">Total de Pedidos Expedidos</div>{inp('equipes.desossa.pedidosTotal')}</div>
-          <div className="form-group"><div className="form-label">Devoluções por Falha Interna</div>{inp('equipes.desossa.devolucoesInternas')}</div>
+        <div className="sec-title mb4">Desossa</div>
+        <div className="fs12 c-text3 mb16">Meta: falhas internas ≤ {(config.desossa?.pctMax??2)}% do total de devoluções · Histórico: Set 10% → Out 8,7% → Nov 4,7%</div>
+        <div className="grid2 mb12">
+          <div className="form-group"><div className="form-label">Total de Vendas (NFs)</div>{inp('equipes.desossa.totalVendas')}</div>
+          <div className="form-group"><div className="form-label">Total de Devoluções</div>{inp('equipes.desossa.totalDevolucoes')}</div>
         </div>
-        {get('equipes.desossa.pedidosTotal',0)>0 && <div className="mt8 fs12 c-text2">
-          Taxa atual: <span className="mono c-gold">{fmtPct((get('equipes.desossa.devolucoesInternas',0)||0)/(get('equipes.desossa.pedidosTotal',1)||1)*100)}</span>
+        <div className="form-group" style={{maxWidth:240}}>
+          <div className="form-label">Devoluções por Falha Interna da Desossa</div>{inp('equipes.desossa.devolucoesInternas')}
+          <div className="fs11 c-text3 mt4">Falhas: produto trocado · vencido · sem vácuo · impróprio · fora do padrão · etiqueta errada · classificação errada</div>
+        </div>
+        {get('equipes.desossa.totalDevolucoes',0)>0 && <div className="mt4 fs12 c-text2">
+          % falha interna: <span className="mono c-gold">{fmtPct((get('equipes.desossa.devolucoesInternas',0)||0)/(get('equipes.desossa.totalDevolucoes',1)||1)*100)}</span>
+          <span className="c-text3"> ({get('equipes.desossa.devolucoesInternas',0)} de {get('equipes.desossa.totalDevolucoes',0)} devoluções)</span>
         </div>}
-        <div className="divider"/>
-        <div className="label mb8">Falhas Internas (para referência)</div>
-        <div className="fs12 c-text3">Produto trocado · Vencido · Embalagem sem vácuo · Impróprio p/ consumo · Fora do padrão · Etiqueta errada · Classificação errada</div>
       </div>}
 
       {/* EXPEDIÇÃO */}
       {tab===5 && <div className="card">
-        <div className="sec-title mb16">Expedição</div>
-        <div className="fs12 c-text3 mb16">Meta: Devoluções por falha interna ≤ 10% — Histórico: Jun/42%, Jul/34%, Ago/29%, Set/21%</div>
-        <div className="grid2">
-          <div className="form-group"><div className="form-label">Total de Pedidos Expedidos</div>{inp('equipes.expedicao.pedidosTotal')}</div>
-          <div className="form-group"><div className="form-label">Devoluções por Falha Interna</div>{inp('equipes.expedicao.devolucoesInternas')}</div>
+        <div className="sec-title mb4">Expedição</div>
+        <div className="fs12 c-text3 mb16">Meta: falhas internas ≤ {(config.expedicao?.pctMax??10)}% do total de devoluções · Histórico: Jun 42% → Jul 34% → Ago 29% → Set 21%</div>
+        <div className="grid2 mb12">
+          <div className="form-group"><div className="form-label">Total de Vendas (NFs)</div>{inp('equipes.expedicao.totalVendas')}</div>
+          <div className="form-group"><div className="form-label">Total de Devoluções</div>{inp('equipes.expedicao.totalDevolucoes')}</div>
         </div>
-        {get('equipes.expedicao.pedidosTotal',0)>0 && <div className="mt8 fs12 c-text2">
-          Taxa atual: <span className="mono c-gold">{fmtPct((get('equipes.expedicao.devolucoesInternas',0)||0)/(get('equipes.expedicao.pedidosTotal',1)||1)*100)}</span>
+        <div className="form-group" style={{maxWidth:240}}>
+          <div className="form-label">Devoluções por Falha Interna da Expedição</div>{inp('equipes.expedicao.devolucoesInternas')}
+          <div className="fs11 c-text3 mt4">Falhas: produto não carregado · mercadoria errada · erro de pesagem · enviado a mais · carregado sem bipar</div>
+        </div>
+        {get('equipes.expedicao.totalDevolucoes',0)>0 && <div className="mt4 fs12 c-text2">
+          % falha interna: <span className="mono c-gold">{fmtPct((get('equipes.expedicao.devolucoesInternas',0)||0)/(get('equipes.expedicao.totalDevolucoes',1)||1)*100)}</span>
+          <span className="c-text3"> ({get('equipes.expedicao.devolucoesInternas',0)} de {get('equipes.expedicao.totalDevolucoes',0)} devoluções)</span>
         </div>}
-        <div className="divider"/>
-        <div className="label mb8">Falhas Internas (para referência)</div>
-        <div className="fs12 c-text3">Produto não carregado · Mercadoria errada · Erro de pesagem · Enviado a mais · Carregado sem bipar</div>
       </div>}
 
       {/* INDIVIDUAL */}
@@ -686,6 +745,8 @@ function Equipes({ colaboradores, onSave }) {
   const [equipe, setEquipe] = useState('abate');
   const [dataEntrada, setDataEntrada] = useState('');
   const [saving, setSaving] = useState(false);
+  const [editando, setEditando] = useState(null); // id do colaborador em modo edição
+  const [editForm, setEditForm] = useState({});   // dados do formulário de edição
 
   const adicionar = async () => {
     if(!nome.trim()) return;
@@ -697,6 +758,24 @@ function Equipes({ colaboradores, onSave }) {
       onSave('Colaborador adicionado!','ok');
     } catch(e){ onSave('Erro: '+e.message,'err'); }
     setSaving(false);
+  };
+
+  const abrirEdicao = (c) => {
+    setEditando(c.id);
+    setEditForm({ nome: c.nome, equipe: c.equipe, dataEntrada: c.dataEntrada||'' });
+  };
+
+  const salvarEdicao = async (c) => {
+    if(!editForm.nome.trim()) return;
+    try {
+      await db.ref(`metafrispar/colaboradores/${c.id}`).update({
+        nome: editForm.nome.trim(),
+        equipe: editForm.equipe,
+        dataEntrada: editForm.dataEntrada||null,
+      });
+      setEditando(null);
+      onSave('Colaborador atualizado!','ok');
+    } catch(e){ onSave('Erro: '+e.message,'err'); }
   };
 
   const toggleAtivo = async (c) => {
@@ -752,16 +831,49 @@ function Equipes({ colaboradores, onSave }) {
             {grupo.length===0
               ? <div className="fs12 c-text3">Nenhum colaborador nesta equipe.</div>
               : grupo.map(c=>(
-                <div key={c.id} className="flex items-center justify-between" style={{padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
-                  <div>
-                    <div className="fw5 fs12" style={{color:c.ativo!==false?'var(--text)':'var(--text3)'}}>{c.nome}</div>
-                    <div className="fs11 c-text3">{c.dataEntrada ? `Entrada: ${c.dataEntrada}` : 'Sem data cadastrada'}</div>
-                    {c.ativo===false && <span className="badge badge-gray" style={{fontSize:10}}>Inativo</span>}
-                  </div>
-                  <div className="flex gap8">
-                    <button className="btn btn-ghost btn-sm" onClick={()=>toggleAtivo(c)}>{c.ativo!==false?'Desativar':'Ativar'}</button>
-                    <button className="btn btn-red btn-sm" onClick={()=>remover(c)}><Icon.trash/></button>
-                  </div>
+                <div key={c.id} style={{padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
+                  {editando===c.id ? (
+                    /* ── MODO EDIÇÃO ── */
+                    <div style={{background:'var(--goldfaint)',border:'1px solid var(--gold3)',borderRadius:8,padding:'12px'}}>
+                      <div className="fs12 fw6 mb8" style={{color:'var(--gold2)'}}>Editando: {c.nome}</div>
+                      <div className="form-group">
+                        <div className="form-label">Nome</div>
+                        <input type="text" value={editForm.nome} onChange={e=>setEditForm(f=>({...f,nome:e.target.value}))} />
+                      </div>
+                      <div className="grid2">
+                        <div className="form-group">
+                          <div className="form-label">Equipe</div>
+                          <select value={editForm.equipe} onChange={e=>setEditForm(f=>({...f,equipe:e.target.value}))}>
+                            {EQUIPES_IDS.map(e=><option key={e} value={e}>{EQUIPES[e]}</option>)}
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <div className="form-label">Data de Entrada</div>
+                          <input type="date" value={editForm.dataEntrada} onChange={e=>setEditForm(f=>({...f,dataEntrada:e.target.value}))} />
+                        </div>
+                      </div>
+                      <div className="flex gap8 mt8">
+                        <button className="btn btn-gold btn-sm" onClick={()=>salvarEdicao(c)}>
+                          <Icon.save/>Salvar
+                        </button>
+                        <button className="btn btn-ghost btn-sm" onClick={()=>setEditando(null)}>Cancelar</button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* ── MODO NORMAL ── */
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="fw5 fs12" style={{color:c.ativo!==false?'var(--text)':'var(--text3)'}}>{c.nome}</div>
+                        <div className="fs11 c-text3">{c.dataEntrada ? `Entrada: ${c.dataEntrada}` : 'Sem data cadastrada'}</div>
+                        {c.ativo===false && <span className="badge badge-gray" style={{fontSize:10}}>Inativo</span>}
+                      </div>
+                      <div className="flex gap8">
+                        <button className="btn btn-ghost btn-sm" onClick={()=>abrirEdicao(c)} style={{color:'var(--gold2)'}}>Editar</button>
+                        <button className="btn btn-ghost btn-sm" onClick={()=>toggleAtivo(c)}>{c.ativo!==false?'Desativar':'Ativar'}</button>
+                        <button className="btn btn-red btn-sm" onClick={()=>remover(c)}><Icon.trash/></button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))
             }
@@ -835,6 +947,106 @@ function Historico({ todosMeses }) {
   );
 }
 
+
+// ─── CONFIGURAÇÕES ────────────────────────────────────────────────────────────
+function Configuracoes({ config, onSave }) {
+  const [local, setLocal] = useState(JSON.parse(JSON.stringify(config)));
+  const [saving, setSaving] = useState(false);
+
+  const set = (path, val) => {
+    setLocal(prev => {
+      const n = JSON.parse(JSON.stringify(prev));
+      const parts = path.split('.');
+      let cur = n;
+      for(let i=0;i<parts.length-1;i++){ if(!cur[parts[i]])cur[parts[i]]={};cur=cur[parts[i]]; }
+      cur[parts[parts.length-1]] = isNaN(Number(val))||val===''?val:Number(val);
+      return n;
+    });
+  };
+  const get = (path, def='') => {
+    const parts = path.split('.');
+    let cur = local;
+    for(const p of parts){ if(cur==null)return def; cur=cur[p]; }
+    return cur??def;
+  };
+  const inp = (path, label) => (
+    <div className="form-group">
+      <div className="form-label">{label}</div>
+      <input type="number" min="0" step="0.1" value={get(path)} onChange={e=>set(path,e.target.value)} style={{maxWidth:160}}/>
+    </div>
+  );
+
+  const salvar = async () => {
+    setSaving(true);
+    await onSave(local);
+    setSaving(false);
+  };
+
+  const resetar = () => {
+    if(!window.confirm('Restaurar todas as configurações para o padrão?')) return;
+    setLocal(JSON.parse(JSON.stringify(DEFAULT_CONFIG)));
+  };
+
+  return (
+    <div>
+      <div className="card mb16">
+        <div className="sec-title mb4">Bonificações Gerais</div>
+        <div className="fs12 c-text3 mb16">Valores em R$ pagos quando cada meta é atingida. Valor total máximo = bonificação empresa + individual + equipe.</div>
+        <div className="grid3">
+          {inp('bonusEmpresa','Meta Empresa (R$)')}
+          {inp('bonusIndividual','Meta Individual (R$)')}
+        </div>
+        <div className="fs11 c-text3">O bônus de equipe é configurado individualmente em cada setor abaixo.</div>
+      </div>
+
+      <div className="card mb16">
+        <div className="sec-title mb12">Linha de Abate</div>
+        <div className="grid2">
+          {inp('abate.carcacaMax','% máx. contam. carcaça')}
+          {inp('abate.couroMax','% máx. couro furado')}
+        </div>
+        {inp('abate.bonus','Bônus total da equipe (R$)')}
+        <div className="fs11 c-text3 mt4">Cada meta vale metade do bônus total. Se bater só 1 de 2 metas, recebe 50%.</div>
+      </div>
+
+      <div className="card mb16">
+        <div className="sec-title mb12">Miúdos</div>
+        <div className="grid2">
+          {inp('miudos.rumensMax','% máx. contam. rúmens')}
+          {inp('miudos.carneMin','Média mín. carne de cabeça (kg/animal)')}
+        </div>
+        {inp('miudos.bonus','Bônus total da equipe (R$)')}
+        <div className="fs11 c-text3 mt4">Cada meta vale metade do bônus total. Se bater só 1 de 2 metas, recebe 50%.</div>
+      </div>
+
+      <div className="card mb16">
+        <div className="sec-title mb12">Área Externa</div>
+        {inp('areaExterna.mediaMin','Média mínima nas avaliações semanais')}
+        {inp('areaExterna.bonus','Bônus da equipe (R$)')}
+      </div>
+
+      <div className="card mb16">
+        <div className="sec-title mb12">Desossa</div>
+        {inp('desossa.pctMax','% máx. falhas internas (sobre total devoluções)')}
+        {inp('desossa.bonus','Bônus da equipe (R$)')}
+      </div>
+
+      <div className="card mb16">
+        <div className="sec-title mb12">Expedição</div>
+        {inp('expedicao.pctMax','% máx. falhas internas (sobre total devoluções)')}
+        {inp('expedicao.bonus','Bônus da equipe (R$)')}
+      </div>
+
+      <div className="flex gap8 mt20">
+        <button className="btn btn-gold" onClick={salvar} disabled={saving}>
+          <Icon.save/>{saving?'Salvando…':'Salvar configurações'}
+        </button>
+        <button className="btn btn-ghost" onClick={resetar}>Restaurar padrão</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── APP ──────────────────────────────────────────────────────────────────────
 function App() {
   const [page, setPage] = useState('dashboard');
@@ -843,6 +1055,7 @@ function App() {
   const [colaboradores, setColabs] = useState([]);
   const [todosMeses, setTodosMeses] = useState({});
   const [loadingMes, setLoadingMes] = useState(false);
+  const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [notify, setNotify] = useState(null);
 
   const mesKey = getMesKey(mes.ano, mes.mes);
@@ -868,6 +1081,14 @@ function App() {
     return ()=>ref.off('value', cb);
   },[mesKey]);
 
+  // Firebase: config
+  useEffect(()=>{
+    const ref = db.ref('metafrispar/config');
+    const cb = snap => { if(snap.val()) setConfig(mergeConfig(snap.val())); };
+    ref.on('value', cb);
+    return ()=>ref.off('value', cb);
+  },[]);
+
   // Firebase: todos os meses (para histórico)
   useEffect(()=>{
     const ref = db.ref('metafrispar/meses');
@@ -885,15 +1106,22 @@ function App() {
     });
   };
 
-  const metasEq = calcEquipes(dadosMes.equipes||{});
+  const metasEq = calcEquipes(dadosMes.equipes||{}, config);
 
-  const pageTitles = { dashboard:'Dashboard', lancamento:'Lançamento de Dados', equipes:'Gestão de Equipes', historico:'Histórico' };
+  const pageTitles = { dashboard:'Dashboard', lancamento:'Lançamento de Dados', equipes:'Gestão de Equipes', historico:'Histórico', config:'Configurações' };
   const navItems = [
     { id:'dashboard', label:'Dashboard', icon:<Icon.dashboard/> },
     { id:'lancamento', label:'Lançar Dados', icon:<Icon.lancamento/> },
     { id:'equipes', label:'Equipes', icon:<Icon.equipes/> },
     { id:'historico', label:'Histórico', icon:<Icon.historico/> },
+    { id:'config', label:'Configurações', icon:<Icon.save/> },
   ];
+
+  const onSaveConfig = async (cfg) => {
+    await db.ref('metafrispar/config').set(cfg);
+    setConfig(mergeConfig(cfg));
+    setNotify({m:'Configurações salvas!',t:'ok'});
+  };
 
   const showMesSel = page==='dashboard'||page==='lancamento';
 
@@ -932,16 +1160,26 @@ function App() {
           {loadingMes&&(page==='dashboard'||page==='lancamento')
             ? <div className="loading">Carregando dados…</div>
             : <>
-              {page==='dashboard' && <Dashboard mesKey={mesKey} dadosMes={dadosMes} colaboradores={colaboradores} metasEq={metasEq}/>}
-              {page==='lancamento' && <Lancamento mesKey={mesKey} dadosMes={dadosMes} colaboradores={colaboradores} onSave={(m,t)=>setNotify({m,t})}/>}
+              {page==='dashboard' && <Dashboard mesKey={mesKey} dadosMes={dadosMes} colaboradores={colaboradores} metasEq={metasEq} config={config}/>}
+              {page==='lancamento' && <Lancamento mesKey={mesKey} dadosMes={dadosMes} colaboradores={colaboradores} config={config} onSave={(m,t)=>setNotify({m,t})}/>}
               {page==='equipes' && <Equipes colaboradores={colaboradores} onSave={(m,t)=>setNotify({m,t})}/>}
               {page==='historico' && <Historico todosMeses={todosMeses}/>}
+              {page==='config' && <Configuracoes config={config} onSave={onSaveConfig}/>}
             </>
           }
         </div>
       </div>
 
       {notify && <Notify msg={notify.m} type={notify.t} onDone={()=>setNotify(null)}/>}
+
+      <nav className="mobile-nav">
+        {navItems.map(n=>(
+          <div key={n.id} className={"mobile-nav-item"+(page===n.id?' active':'')} onClick={()=>setPage(n.id)}>
+            <span className="mobile-nav-icon">{n.id==='dashboard'?'⊞':n.id==='lancamento'?'✎':n.id==='equipes'?'◎':n.id==='config'?'⚙':'∿'}</span>
+            <span>{n.id==='dashboard'?'Dashboard':n.id==='lancamento'?'Lançar':n.id==='equipes'?'Equipes':n.id==='config'?'Config':'Histórico'}</span>
+          </div>
+        ))}
+      </nav>
     </>
   );
 }
